@@ -153,6 +153,12 @@ struct SessionState: Equatable, Identifiable, Sendable {
         activePermission?.descriptionText
     }
 
+    /// Whether the pending permission can actually be granted from the notch.
+    /// False for security-flagged prompts — those must be answered in the app.
+    var canRemoteApprove: Bool {
+        activePermission?.canRemoteApprove ?? true
+    }
+
     /// Short badge identifying which Claude account/install owns this session.
     /// Desktop instances are told apart by their --user-data-dir, which appears
     /// in the claude-code binary path the hook reports.

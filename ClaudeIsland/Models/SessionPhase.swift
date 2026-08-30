@@ -14,6 +14,9 @@ struct PermissionContext: Sendable {
     let toolName: String
     let toolInput: [String: AnyCodable]?
     let receivedAt: Date
+    /// False for security-flagged prompts — the hook's answer is ignored by
+    /// Claude Code, so the notch offers "Open in app" instead of Allow/Deny
+    var canRemoteApprove: Bool = true
 
     /// Human-readable summary of the pending tool call (e.g. Bash's `description`
     /// parameter) — the same text Claude Code's own permission dialog shows

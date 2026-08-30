@@ -144,9 +144,36 @@ actor SessionStore {
             return
         }
 
+        // Fallback approval signal: a permission_prompt notification arriving
+        // while no PermissionRequest covers the session (e.g. subagent prompts,
+        // where PermissionRequest hooks never fire). Not remote-approvable —
+        // shows the approve-in-app row.
+        if event.status == "permission_prompt_notification" {
+            if !session.phase.isWaitingForApproval {
+                let toolName = event.message?.components(separatedBy: " ").last ?? "a tool"
+                let newPhase = SessionPhase.waitingForApproval(PermissionContext(
+                    toolUseId: "",
+                    toolName: toolName,
+                    toolInput: nil,
+                    receivedAt: Date(),
+                    canRemoteApprove: false
+                ))
+                if session.phase.canTransition(to: newPhase) {
+                    session.phase = newPhase
+                }
+            }
+            sessions[sessionId] = session
+            publishState()
+            return
+        }
+
         let newPhase = event.determinePhase()
 
-        if session.phase.canTransition(to: newPhase) {
+        let transitionAllowed = session.phase.canTransition(to: newPhase)
+        if event.event == "PermissionRequest" {
+            Self.logger.info("PermissionRequest \(sessionId.prefix(8), privacy: .public): canRemote=\(event.canRemoteApprove, privacy: .public) \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public) allowed=\(transitionAllowed, privacy: .public)")
+        }
+        if transitionAllowed {
             session.phase = newPhase
         } else {
             Self.logger.debug("Invalid transition: \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")

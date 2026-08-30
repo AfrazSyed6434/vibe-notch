@@ -75,7 +75,8 @@ struct ClaudeInstancesView: View {
                         onChat: { openChat(session) },
                         onArchive: { archiveSession(session) },
                         onApprove: { approveSession(session) },
-                        onReject: { rejectSession(session) }
+                        onReject: { rejectSession(session) },
+                        onOpenInApp: { openInApp(session) }
                     )
                     .id(session.stableId)
                 }
@@ -103,6 +104,15 @@ struct ClaudeInstancesView: View {
         viewModel.showChat(for: session)
     }
 
+    /// Open the session's chat in its owning Claude desktop app (work or
+    /// personal instance); falls back to the in-notch chat for sessions we
+    /// can't route (e.g. unmapped terminal sessions).
+    private func openInApp(_ session: SessionState) {
+        if !DesktopAppLauncher.open(session: session) {
+            openChat(session)
+        }
+    }
+
     private func approveSession(_ session: SessionState) {
         sessionMonitor.approvePermission(sessionId: session.sessionId)
     }
@@ -125,6 +135,7 @@ struct InstanceRow: View {
     let onArchive: () -> Void
     let onApprove: () -> Void
     let onReject: () -> Void
+    let onOpenInApp: () -> Void
 
     @State private var isHovered = false
     @State private var spinnerPhase = 0
@@ -294,6 +305,32 @@ struct InstanceRow: View {
                     }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            } else if isWaitingForApproval && !session.canRemoteApprove {
+                // Security-flagged prompt: Claude Code ignores hook decisions,
+                // so route the user to the app instead of offering Allow/Deny
+                HStack(spacing: 6) {
+                    IconButton(icon: "bubble.left") {
+                        onChat()
+                    }
+
+                    Button {
+                        onOpenInApp()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 10, weight: .medium))
+                            Text("Open in app")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(TerminalColors.amber)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(TerminalColors.amber.opacity(0.15))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             } else if isWaitingForApproval {
                 InlineApprovalButtons(
                     onChat: onChat,
@@ -330,7 +367,7 @@ struct InstanceRow: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            onChat()
+            onOpenInApp()
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isWaitingForApproval)
         .background(

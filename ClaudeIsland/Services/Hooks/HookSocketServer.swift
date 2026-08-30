@@ -27,6 +27,9 @@ struct HookEvent: Codable, Sendable {
     let message: String?
     /// Full path of the Claude process executable (identifies the desktop account / install)
     let claudeBinary: String?
+    /// Present on ordinary permission prompts; absent on security-flagged ones,
+    /// where Claude Code ignores hook "allow" decisions
+    let permissionSuggestions: AnyCodable?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -36,10 +39,11 @@ struct HookEvent: Codable, Sendable {
         case notificationType = "notification_type"
         case message
         case claudeBinary = "claude_binary"
+        case permissionSuggestions = "permission_suggestions"
     }
 
     /// Create a copy with updated toolUseId
-    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?, claudeBinary: String? = nil) {
+    init(sessionId: String, cwd: String, event: String, status: String, pid: Int?, tty: String?, tool: String?, toolInput: [String: AnyCodable]?, toolUseId: String?, notificationType: String?, message: String?, claudeBinary: String? = nil, permissionSuggestions: AnyCodable? = nil) {
         self.sessionId = sessionId
         self.cwd = cwd
         self.event = event
@@ -52,6 +56,14 @@ struct HookEvent: Codable, Sendable {
         self.notificationType = notificationType
         self.message = message
         self.claudeBinary = claudeBinary
+        self.permissionSuggestions = permissionSuggestions
+    }
+
+    /// Whether the hook's allow/deny answer will actually be honored.
+    /// Security-flagged prompts (no permission_suggestions) must be answered
+    /// in the Claude app itself.
+    nonisolated var canRemoteApprove: Bool {
+        permissionSuggestions != nil
     }
 
     var sessionPhase: SessionPhase {
@@ -67,7 +79,8 @@ struct HookEvent: Codable, Sendable {
                 toolUseId: toolUseId ?? "",
                 toolName: tool ?? "unknown",
                 toolInput: toolInput,
-                receivedAt: Date()
+                receivedAt: Date(),
+                canRemoteApprove: canRemoteApprove
             ))
         case "waiting_for_input":
             return .waitingForInput
@@ -426,6 +439,21 @@ class HookSocketServer {
         }
 
         if event.expectsResponse {
+            // Security-flagged prompt: Claude Code ignores hook "allow" answers,
+            // so release the hook immediately with "ask" (normal in-app prompt)
+            // and surface an approve-in-app row instead of Allow/Deny buttons.
+            if !event.canRemoteApprove {
+                if let data = try? JSONEncoder().encode(HookResponse(decision: "ask", reason: nil)) {
+                    data.withUnsafeBytes { bytes in
+                        guard let base = bytes.baseAddress else { return }
+                        _ = write(clientSocket, base, data.count)
+                    }
+                }
+                close(clientSocket)
+                eventHandler?(event)
+                return
+            }
+
             let toolUseId: String
             if let eventToolUseId = event.toolUseId {
                 toolUseId = eventToolUseId
@@ -452,7 +480,8 @@ class HookSocketServer {
                 toolUseId: toolUseId,  // Use resolved toolUseId
                 notificationType: event.notificationType,
                 message: event.message,
-                claudeBinary: event.claudeBinary
+                claudeBinary: event.claudeBinary,
+                permissionSuggestions: event.permissionSuggestions
             )
 
             let pending = PendingPermission(
