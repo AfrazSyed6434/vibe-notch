@@ -23,6 +23,10 @@ struct SessionState: Equatable, Identifiable, Sendable {
     var tty: String?
     var isInTmux: Bool
 
+    /// Full path of the Claude process executable (from the hook), used to
+    /// attribute the session to a desktop account or terminal install
+    var claudeBinary: String?
+
     // MARK: - State Machine
 
     /// Current phase in the session lifecycle
@@ -142,6 +146,21 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// Pending tool use ID
     var pendingToolId: String? {
         activePermission?.toolUseId
+    }
+
+    /// Human-readable description of the pending tool call, if the tool provided one
+    var pendingToolDescription: String? {
+        activePermission?.descriptionText
+    }
+
+    /// Short badge identifying which Claude account/install owns this session.
+    /// Desktop instances are told apart by their --user-data-dir, which appears
+    /// in the claude-code binary path the hook reports.
+    var accountBadge: String? {
+        guard let binary = claudeBinary else { return nil }
+        if binary.contains("/.claude-work-desktop/") { return "Work" }
+        if binary.contains("/Application Support/Claude/") { return "Personal" }
+        return nil
     }
 
     /// Formatted pending tool input for display

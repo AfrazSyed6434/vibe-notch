@@ -15,6 +15,14 @@ struct PermissionContext: Sendable {
     let toolInput: [String: AnyCodable]?
     let receivedAt: Date
 
+    /// Human-readable summary of the pending tool call (e.g. Bash's `description`
+    /// parameter) — the same text Claude Code's own permission dialog shows
+    var descriptionText: String? {
+        guard let desc = toolInput?["description"]?.value as? String,
+              !desc.isEmpty else { return nil }
+        return desc
+    }
+
     /// Format tool input for display
     var formattedInput: String? {
         guard let input = toolInput else { return nil }

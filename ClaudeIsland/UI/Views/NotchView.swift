@@ -243,19 +243,26 @@ struct NotchView: View {
 
     // MARK: - Header Row (persists across states)
 
+    /// Number of sessions currently blocked on a permission approval
+    private var pendingApprovalCount: Int {
+        sessionMonitor.instances.filter { $0.phase.isWaitingForApproval }.count
+    }
+
     @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
-            // Left side - crab + optional permission indicator (visible when processing, pending, or waiting for input)
+            // Left side - status only: amber approval count when blocked, green
+            // checkmark when ready for input. The crab identity icon lives on
+            // the right; no perpetual spinner.
             if showClosedActivity {
                 HStack(spacing: 4) {
-                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                        .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
-
-                    // Permission indicator only (amber) - waiting for input shows checkmark on right
                     if hasPendingPermission {
                         PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
-                            .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: showClosedActivity)
+                        Text("\(pendingApprovalCount)")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Color(red: 0.85, green: 0.47, blue: 0.34))
+                    } else if hasWaitingForInput {
+                        ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
                     }
                 }
                 .frame(width: viewModel.status == .opened ? nil : sideWidth + (hasPendingPermission ? 18 : 0))
@@ -278,20 +285,12 @@ struct NotchView: View {
                     .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
             }
 
-            // Right side - spinner when processing/pending, checkmark when waiting for input
+            // Right side - crab identity icon; legs animate only while processing
             if showClosedActivity {
-                if isProcessing || hasPendingPermission {
-                    ProcessingSpinner()
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
-                } else if hasWaitingForInput {
-                    // Checkmark for waiting-for-input on the right side
-                    ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                        .padding(.trailing, viewModel.status == .opened ? 0 : 4)
-                }
+                ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
+                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
+                    .frame(width: viewModel.status == .opened ? 20 : sideWidth)
+                    .padding(.trailing, viewModel.status == .opened ? 0 : 4)
             }
         }
         .frame(height: closedNotchSize.height)

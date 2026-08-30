@@ -7,6 +7,7 @@ Claude Island Hook
 import json
 import os
 import socket
+import subprocess
 import sys
 
 SOCKET_PATH = "/tmp/claude-island.sock"
@@ -47,6 +48,22 @@ def get_tty():
     except (OSError, AttributeError):
         pass
     return None
+
+
+def get_claude_binary(pid):
+    """Full executable path of the Claude process — identifies which desktop
+    account (user-data-dir) or terminal install the session belongs to."""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "comm="],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        path = result.stdout.strip()
+        return path or None
+    except Exception:
+        return None
 
 
 def send_event(state):
@@ -93,6 +110,7 @@ def main():
         "event": event,
         "pid": claude_pid,
         "tty": tty,
+        "claude_binary": get_claude_binary(claude_pid),
     }
 
     # Map events to status

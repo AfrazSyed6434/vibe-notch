@@ -177,6 +177,17 @@ struct InstanceRow: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
+                    // Account badge (Work / Personal desktop instance)
+                    if let badge = session.accountBadge {
+                        Text(badge)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.5))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+
                     // Token usage indicator
                     if session.usage.totalTokens > 0 {
                         Text(session.usage.formattedTotal)
@@ -187,7 +198,14 @@ struct InstanceRow: View {
 
                 // Show tool call when waiting for approval, otherwise last activity
                 if isWaitingForApproval, let toolName = session.pendingToolName {
-                    // Show tool name in amber + input on same line
+                    // Human-readable summary first (same text the in-app dialog
+                    // shows), then tool name in amber + raw input below it
+                    if let description = session.pendingToolDescription {
+                        Text(description)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                    }
                     HStack(spacing: 4) {
                         Text(MCPToolFormatter.formatToolName(toolName))
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
