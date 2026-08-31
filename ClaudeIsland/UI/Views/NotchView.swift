@@ -19,7 +19,6 @@ struct NotchView: View {
     @ObservedObject var viewModel: NotchViewModel
     @StateObject private var sessionMonitor = ClaudeSessionMonitor()
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
-    @ObservedObject private var updateManager = UpdateManager.shared
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
     @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
@@ -285,12 +284,13 @@ struct NotchView: View {
                     .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
             }
 
-            // Right side - crab identity icon; legs animate only while processing
-            if showClosedActivity {
+            // Right side - crab identity icon; legs animate only while processing.
+            // Hidden when opened — the opened header renders its own crab (menu toggle).
+            if showClosedActivity && viewModel.status != .opened {
                 ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
-                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
-                    .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                    .padding(.trailing, viewModel.status == .opened ? 0 : 4)
+                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: viewModel.status != .opened)
+                    .frame(width: sideWidth)
+                    .padding(.trailing, 4)
             }
         }
         .frame(height: closedNotchSize.height)
@@ -305,40 +305,18 @@ struct NotchView: View {
     @ViewBuilder
     private var openedHeaderContent: some View {
         HStack(spacing: 12) {
-            // Show static crab only if not showing activity in headerRow
-            // (headerRow handles crab + indicator when showClosedActivity is true)
-            if !showClosedActivity {
-                ClaudeCrabIcon(size: 14)
-                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: !showClosedActivity)
-                    .padding(.leading, 8)
-            }
-
             Spacer()
 
-            // Menu toggle
+            // Single crab icon on the right — tapping opens/closes settings
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     viewModel.toggleMenu()
-                    if viewModel.contentType == .menu {
-                        updateManager.markUpdateSeen()
-                    }
                 }
             } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: viewModel.contentType == .menu ? "xmark" : "line.3.horizontal")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-
-                    // Green dot for unseen update
-                    if updateManager.hasUnseenUpdate && viewModel.contentType != .menu {
-                        Circle()
-                            .fill(TerminalColors.green)
-                            .frame(width: 6, height: 6)
-                            .offset(x: -2, y: 2)
-                    }
-                }
+                ClaudeCrabIcon(size: 14)
+                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: viewModel.status == .opened)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

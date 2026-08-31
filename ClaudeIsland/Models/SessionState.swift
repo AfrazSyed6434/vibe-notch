@@ -159,14 +159,21 @@ struct SessionState: Equatable, Identifiable, Sendable {
         activePermission?.canRemoteApprove ?? true
     }
 
-    /// Short badge identifying which Claude account/install owns this session.
-    /// Desktop instances are told apart by their --user-data-dir, which appears
-    /// in the claude-code binary path the hook reports.
+    /// Short badge identifying which Claude desktop instance owns this session.
+    /// Desktop sessions run from <user-data-dir>/claude-code/<ver>/claude.app/…,
+    /// so the user-data-dir in the hook-reported binary path names the account:
+    /// the default install shows "Personal", a custom --user-data-dir like
+    /// ~/.claude-work-desktop shows "Work". Terminal sessions get no badge.
     var accountBadge: String? {
-        guard let binary = claudeBinary else { return nil }
-        if binary.contains("/.claude-work-desktop/") { return "Work" }
-        if binary.contains("/Application Support/Claude/") { return "Personal" }
-        return nil
+        guard let binary = claudeBinary,
+              let range = binary.range(of: "/claude-code/") else { return nil }
+        let dataDir = String(binary[..<range.lowerBound])
+        if dataDir.hasSuffix("/Library/Application Support/Claude") { return "Personal" }
+        var name = (dataDir as NSString).lastPathComponent
+        if name.hasPrefix(".") { name.removeFirst() }
+        name = name.replacingOccurrences(of: "claude-", with: "")
+            .replacingOccurrences(of: "-desktop", with: "")
+        return name.isEmpty ? nil : name.capitalized
     }
 
     /// Formatted pending tool input for display

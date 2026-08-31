@@ -160,12 +160,6 @@ def main():
         state["tool"] = data.get("tool_name")
         state["tool_input"] = tool_input
         state["permission_suggestions"] = data.get("permission_suggestions")
-        # Debug: capture raw payloads to study security-flagged prompts
-        try:
-            with open(os.path.expanduser("~/.claude/session-status/permreq-debug.jsonl"), "a") as f:
-                f.write(json.dumps(data) + "\n")
-        except OSError:
-            pass
         # tool_use_id lookup handled by Swift-side cache from PreToolUse
 
         # Send to app and wait for decision
@@ -212,11 +206,6 @@ def main():
             state["status"] = "permission_prompt_notification"
             state["message"] = data.get("message")
             state["notification_type"] = notification_type
-            try:
-                with open(os.path.expanduser("~/.claude/session-status/permreq-debug.jsonl"), "a") as f:
-                    f.write(json.dumps(data) + "\n")
-            except OSError:
-                pass
             send_event(state)
             sys.exit(0)
         elif notification_type == "idle_prompt":

@@ -2,11 +2,9 @@
 //  DesktopAppLauncher.swift
 //  ClaudeIsland
 //
-//  Opens a session's chat in the owning Claude desktop app instance via the
-//  claude://code/<local_sessionId> deep link. The desktop apps keep a
-//  per-session JSON store mapping their internal local_* ids to the CLI
-//  session id that hooks report, and the deep link routes to the correct
-//  instance (work/personal user-data-dir) automatically.
+//  Brings the app that owns a session to the front — the correct Claude
+//  desktop instance when several run with different --user-data-dir values,
+//  or the hosting terminal/IDE for terminal sessions.
 //
 
 import AppKit
@@ -16,15 +14,6 @@ import os.log
 enum DesktopAppLauncher {
 
     private static let logger = Logger(subsystem: "com.claudeisland", category: "AppLauncher")
-
-    /// Session store roots, one per desktop instance (user-data-dir)
-    private static var storeRoots: [URL] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return [
-            home.appendingPathComponent(".claude-work-desktop/claude-code-sessions"),
-            home.appendingPathComponent("Library/Application Support/Claude/claude-code-sessions"),
-        ]
-    }
 
     /// Bring the app that owns this session to the front — the correct Claude
     /// desktop instance (work/personal, resolved by pid, since both share one
@@ -39,37 +28,6 @@ enum DesktopAppLauncher {
     static func open(session: SessionState) -> Bool {
         logger.info("activate requested for \(session.sessionId.prefix(8), privacy: .public) pid:\(session.pid ?? -1, privacy: .public)")
         return activateOwningApp(pid: session.pid)
-    }
-
-    /// Scan the desktop session stores for the local_* session whose
-    /// cliSessionId (current or prior) matches the hook-reported session id.
-    private static func findLocalSessionId(cliSessionId: String, claudeBinary: String?) -> String? {
-        let fm = FileManager.default
-        var roots = storeRoots
-        // Search the session's own account store first
-        if let binary = claudeBinary {
-            roots.sort { a, _ in
-                binary.contains("/.claude-work-desktop/") == a.path.contains("/.claude-work-desktop/")
-            }
-        }
-        let needle = "\"\(cliSessionId)\""
-        for root in roots {
-            guard let subpaths = try? fm.subpathsOfDirectory(atPath: root.path) else { continue }
-            for sub in subpaths {
-                let name = (sub as NSString).lastPathComponent
-                guard name.hasPrefix("local_"), name.hasSuffix(".json") else { continue }
-                let url = root.appendingPathComponent(sub)
-                guard let data = try? Data(contentsOf: url),
-                      let text = String(data: data, encoding: .utf8),
-                      text.contains(needle),
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
-                let prior = json["priorCliSessionIds"] as? [String] ?? []
-                if json["cliSessionId"] as? String == cliSessionId || prior.contains(cliSessionId) {
-                    return json["sessionId"] as? String
-                }
-            }
-        }
-        return nil
     }
 
     /// Walk the process tree from the session's pid up to the root Claude app

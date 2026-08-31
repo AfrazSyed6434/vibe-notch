@@ -1,59 +1,65 @@
 <div align="center">
   <img src="ClaudeIsland/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Logo" width="100" height="100">
-  <h3 align="center">Vibe Notch (previously Claude Island)</h3>
+  <h3 align="center">Vibe Notch — multi-account fork</h3>
   <p align="center">
-    A macOS menu bar app that brings Dynamic Island-style notifications to Claude Code CLI sessions.
+    Dynamic Island-style monitoring for Claude Code sessions, with support for multiple Claude desktop accounts.
     <br />
-    <br />
-    <a href="https://github.com/farouqaldori/vibe-notch/releases/latest" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/github/v/release/farouqaldori/vibe-notch?style=rounded&color=white&labelColor=000000&label=release" alt="Release Version" />
-    </a>
-    <a href="#" target="_blank" rel="noopener noreferrer">
-      <img alt="GitHub Downloads" src="https://img.shields.io/github/downloads/farouqaldori/vibe-notch/total?style=rounded&color=white&labelColor=000000">
-    </a>
+    Fork of <a href="https://github.com/farouqaldori/vibe-notch">farouqaldori/vibe-notch</a>. See <a href="CHANGELOG.md">CHANGELOG.md</a> for what changed.
   </p>
 </div>
 
-> **🟢 Actively maintained**
->
-> Launched v1.2 in December 2025, then took a 4-month break. v1.3 (April 2026) works through the backlog of contributor PRs and bug reports and kicks off a regular cadence again. Open PRs and issues are being reviewed — thanks for your patience.
+## What it does
 
-## Features
-
-- **Notch UI** — Animated overlay that expands from the MacBook notch
-- **Live Session Monitoring** — Track multiple Claude Code sessions in real-time
-- **Permission Approvals** — Approve or deny tool executions directly from the notch
-- **Chat History** — View full conversation history with markdown rendering
-- **Auto-Setup** — Hooks install automatically on first launch
+- Shows every live Claude Code session in the notch — desktop app and terminal — with working / waiting-for-approval / idle states
+- Approve or deny permission prompts directly from the notch
+- Badges each session with the Claude account it belongs to when you run multiple desktop instances
+- Double click a session to jump to the app that owns it
+- No analytics, no auto updates
 
 ## Requirements
 
 - macOS 15.6+
-- Claude Code CLI
+- Xcode (to build)
+- Claude Code (CLI or the Claude desktop app)
 
-## Install
+## Build and run
 
-Download the latest release or build from source:
+No prebuilt releases on this fork — build from source:
 
 ```bash
-xcodebuild -scheme ClaudeIsland -configuration Release build
+git clone -b afraz-fork https://github.com/AfrazSyed6434/vibe-notch
+cd vibe-notch
+xcodebuild -scheme ClaudeIsland -configuration Release -derivedDataPath build \
+  -destination 'platform=macOS' build \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
+codesign --force --deep -s - "build/Build/Products/Release/Vibe Notch.app"
+open "build/Build/Products/Release/Vibe Notch.app"
 ```
 
-## How It Works
+The `codesign --force --deep` step is required — the bundled Sparkle framework keeps its upstream signature and the app wont launch without re-signing everything ad-hoc.
 
-Vibe Notch installs hooks into `~/.claude/hooks/` that communicate session state via a Unix socket. The app listens for events and displays them in the notch overlay.
+On first launch the app installs Claude Code hooks into `~/.claude/settings.json` and a hook script at `~/.claude/hooks/claude-island-state.py`. Thats all the setup — sessions appear in the notch as they run.
 
-When Claude needs permission to run a tool, the notch expands with approve/deny buttons—no need to switch to the terminal.
+## Single account
 
-## Analytics
+Nothing to configure. Run Claude Code (terminal or desktop app) and sessions show up.
 
-Vibe Notch uses Mixpanel to collect anonymous usage data:
+## Multiple accounts
 
-- **App Launched** — App version, build number, macOS version
-- **Session Started** — When a new Claude Code session is detected
+Run a second Claude desktop instance with its own data dir:
 
-No personal data or conversation content is collected.
+```bash
+open -n /Applications/Claude.app --args --user-data-dir="$HOME/.claude-work-desktop"
+```
+
+Sessions from each instance get a badge named after the data dir — `.claude-work-desktop` shows as **Work**, the default install shows as **Personal**. Any dir name works: `.claude-<name>-desktop` becomes `<Name>`.
+
+Both instances share `~/.claude` for config by default, so one hook install covers everything. Double clicking a session row activates the instance that owns it.
+
+## Permission prompts
+
+Normal prompts get Allow / Deny buttons in the notch. Some commands are security-flagged by Claude Code itself (`cd` + `git` combos, `curl | bash`, force pushes) and it ignores hook approvals for those — the notch shows an **Open in app** button instead, which brings the right app forward so you can answer there.
 
 ## License
 
-Apache 2.0
+Apache 2.0 — same as upstream.
