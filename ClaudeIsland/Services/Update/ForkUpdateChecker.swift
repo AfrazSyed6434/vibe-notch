@@ -7,6 +7,7 @@
 //  icon linking to the README's update instructions.
 //
 
+import Combine
 import Foundation
 import SwiftUI
 
