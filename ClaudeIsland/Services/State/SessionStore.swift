@@ -209,7 +209,7 @@ actor SessionStore {
         if transitionAllowed {
             session.phase = newPhase
         } else {
-            Self.logger.info("Invalid transition: \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")
+            Self.logger.info("Invalid transition \(sessionId.prefix(8), privacy: .public) (\(event.event, privacy: .public)): \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")
         }
 
         // Remember remote-approvable permission contexts so the fallback
@@ -1160,6 +1160,26 @@ actor SessionStore {
     /// Recheck status of all active sessions
     private func recheckAllSessions() {
         var removedSession = false
+
+        // One pid = one live session: a compacted/continued conversation keeps
+        // its process but changes session id, leaving the old row spinning.
+        // Keep the most recently active session per pid.
+        var newestPerPid: [Int: (id: String, activity: Date)] = [:]
+        for (sessionId, session) in sessions {
+            guard let pid = session.pid else { continue }
+            if let existing = newestPerPid[pid] {
+                let loserId = existing.activity >= session.lastActivity ? sessionId : existing.id
+                if session.lastActivity > existing.activity {
+                    newestPerPid[pid] = (sessionId, session.lastActivity)
+                }
+                Self.logger.info("Removing stale session \(loserId.prefix(8), privacy: .public) (pid \(pid, privacy: .public) has a newer session)")
+                sessions.removeValue(forKey: loserId)
+                cancelPendingSync(sessionId: loserId)
+                removedSession = true
+            } else {
+                newestPerPid[pid] = (sessionId, session.lastActivity)
+            }
+        }
 
         for (sessionId, session) in Array(sessions) {
             if session.phase == .ended {
