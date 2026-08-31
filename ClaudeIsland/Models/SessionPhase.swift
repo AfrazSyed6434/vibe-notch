@@ -131,6 +131,9 @@ enum SessionPhase: Sendable {
             return true  // Can become idle
         case (.waitingForInput, .compacting):
             return true
+        case (.waitingForInput, .waitingForApproval):
+            return true  // Permission request racing a Stop — don't drop the
+                         // first signal or the row waits for the ~6s fallback
 
         // WaitingForApproval transitions
         case (.waitingForApproval, .processing):
@@ -149,6 +152,8 @@ enum SessionPhase: Sendable {
             return true
         case (.compacting, .waitingForInput):
             return true
+        case (.compacting, .waitingForApproval):
+            return true  // Same race as waitingForInput above
 
         // Allow staying in same state (no-op transitions)
         default:

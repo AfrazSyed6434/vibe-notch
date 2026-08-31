@@ -58,7 +58,12 @@ Both instances share `~/.claude` for config by default, so one hook install cove
 
 ## Permission prompts
 
-Normal prompts get Allow / Deny buttons in the notch. Some commands are security-flagged by Claude Code itself (`cd` + `git` combos, `curl | bash`, force pushes) and it ignores hook approvals for those — the notch shows an **Open in app** button instead, which brings the right app forward so you can answer there.
+There are two kinds of interrupts, and Claude Code itself decides which one you get:
+
+- **Normal prompts** — the notch shows Allow / Deny and answering there works. These are the prompts that also offer "Always allow" in the app.
+- **Security-flagged prompts** — commands Claude Code considers risky (`cd` + `git` combos, `curl | bash`, force pushes). It ignores hook approvals for these by design, so the notch shows an **Open in app** button instead, which brings the right app forward so you can answer there. These are the prompts with no "Always allow" option in the app.
+
+Known quirk: flagged prompts usually appear in the notch instantly, but occasionally take a few seconds. The immediate signal can get dropped when it races another state change, and the notch then relies on a fallback notification Claude Code sends ~6s after a prompt sits unanswered. Harmless, just a delay.
 
 ## License
 
