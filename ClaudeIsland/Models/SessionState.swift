@@ -38,6 +38,10 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// is still pending. Cleared when the permission resolves.
     var lastRemotePermission: PermissionContext?
 
+    /// Chat title from the Claude desktop app's session store (nil for
+    /// terminal sessions or untitled chats)
+    var desktopTitle: String?
+
     // MARK: - Chat History
 
     /// All chat items for this session (replaces ChatHistoryManager.histories)
@@ -134,9 +138,9 @@ struct SessionState: Equatable, Identifiable, Sendable {
         return sessionId
     }
 
-    /// Display title: summary > first user message > project name
+    /// Display title: desktop app chat title > summary > first user message > project name
     var displayTitle: String {
-        conversationInfo.summary ?? conversationInfo.firstUserMessage ?? projectName
+        desktopTitle ?? conversationInfo.summary ?? conversationInfo.firstUserMessage ?? projectName
     }
 
     /// Best hint for matching window title

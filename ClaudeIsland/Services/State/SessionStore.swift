@@ -149,6 +149,17 @@ actor SessionStore {
         }
         session.lastActivity = Date()
 
+        // Refresh the desktop chat title at turn boundaries (auto-titling and
+        // renames happen between turns; the lookup is cached for 60s)
+        switch event.event {
+        case "SessionStart", "UserPromptSubmit", "Stop":
+            if let title = DesktopSessionTitles.title(cliSessionId: sessionId, claudeBinary: session.claudeBinary) {
+                session.desktopTitle = title
+            }
+        default:
+            break
+        }
+
         if event.status == "ended" {
             sessions.removeValue(forKey: sessionId)
             cancelPendingSync(sessionId: sessionId)
