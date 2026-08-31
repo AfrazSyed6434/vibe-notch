@@ -65,6 +65,10 @@ There are two kinds of interrupts, and Claude Code itself decides which one you 
 
 Known quirk: flagged prompts usually appear in the notch instantly, but occasionally take a few seconds. The immediate signal can get dropped when it races another state change, and the notch then relies on a fallback notification Claude Code sends ~6s after a prompt sits unanswered. Harmless, just a delay.
 
+## Logs
+
+The app writes its own diagnostic log to `~/Library/Logs/VibeNotch.log` (rotates at 5 MB, previous file kept as `VibeNotch.old.log`). Check it when a session shows the wrong state or buttons — every permission decision and state change lands there.
+
 ## License
 
 Apache 2.0 — same as upstream.

@@ -11,3 +11,5 @@ Changes on this branch after forking from upstream v1.3.
 - Removed the always-on spinner in the closed notch. Claude icon moved to the right, and a count of sessions waiting for approval shows on the left in amber
 - In the expanded view the Claude icon on the right opens settings
 - Menu cleaned up: no star on github, no update checks, just a link to this repo
+- Sessions show the chat title from the desktop app instead of a truncated first message
+- App writes its own log file to `~/Library/Logs/VibeNotch.log` for easy debugging
