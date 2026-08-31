@@ -332,7 +332,7 @@ class HookSocketServer {
         toolUseIdCache[key]?.append(toolUseId)
         cacheLock.unlock()
 
-        logger.debug("Cached tool_use_id for \(event.sessionId.prefix(8), privacy: .public) tool:\(event.tool ?? "?", privacy: .public) id:\(toolUseId.prefix(12), privacy: .public)")
+        logger.info("Cached tool_use_id for \(event.sessionId.prefix(8), privacy: .public) tool:\(event.tool ?? "?", privacy: .public) id:\(toolUseId.prefix(12), privacy: .public)")
     }
 
     /// Pop and return cached tool_use_id for PermissionRequest (FIFO)
@@ -354,7 +354,7 @@ class HookSocketServer {
             toolUseIdCache[key] = queue
         }
 
-        logger.debug("Retrieved cached tool_use_id for \(event.sessionId.prefix(8), privacy: .public) tool:\(event.tool ?? "?", privacy: .public) id:\(toolUseId.prefix(12), privacy: .public)")
+        logger.info("Retrieved cached tool_use_id for \(event.sessionId.prefix(8), privacy: .public) tool:\(event.tool ?? "?", privacy: .public) id:\(toolUseId.prefix(12), privacy: .public)")
         return toolUseId
     }
 
@@ -466,7 +466,7 @@ class HookSocketServer {
                 return
             }
 
-            logger.debug("Permission request - keeping socket open for \(event.sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public)")
+            logger.info("Permission request - keeping socket open for \(event.sessionId.prefix(8), privacy: .public) tool:\(toolUseId.prefix(12), privacy: .public)")
 
             let updatedEvent = HookEvent(
                 sessionId: event.sessionId,

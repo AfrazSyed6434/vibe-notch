@@ -181,6 +181,11 @@ actor SessionStore {
                 // painting a bogus approve-in-app row.
                 Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): restoring pending remote permission \(remembered.toolUseId.prefix(12), privacy: .public)")
                 session.phase = .waitingForApproval(remembered)
+            } else if session.phase == .processing {
+                // The notification fires ~6s after a prompt appears — if the
+                // session is processing again, the prompt was already answered
+                // (the answer is what produced the newer events). Stale; ignore.
+                Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): session is processing again, treating as stale")
             } else {
                 Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): painting approve-in-app (phase was \(String(describing: session.phase), privacy: .public))")
                 let toolName = event.message?.components(separatedBy: " ").last ?? "a tool"
@@ -200,7 +205,20 @@ actor SessionStore {
             return
         }
 
-        let newPhase = event.determinePhase()
+        var newPhase = event.determinePhase()
+
+        // Parallel tool calls: another tool starting/finishing must not clear
+        // a still-pending approval — only events about the pending tool itself
+        // (or non-tool events like Stop/interrupt) may move the phase.
+        if case .waitingForApproval(let ctx) = session.phase,
+           newPhase == .processing,
+           event.isToolEvent || event.event == "PostToolUseFailure",
+           !ctx.toolUseId.isEmpty,
+           let eventToolId = event.toolUseId,
+           eventToolId != ctx.toolUseId {
+            Self.logger.info("Keeping pending approval \(ctx.toolUseId.prefix(12), privacy: .public) for \(sessionId.prefix(8), privacy: .public) — \(event.event, privacy: .public) was for different tool \(eventToolId.prefix(12), privacy: .public)")
+            newPhase = session.phase
+        }
 
         let transitionAllowed = session.phase.canTransition(to: newPhase)
         if event.event == "PermissionRequest" {
@@ -515,7 +533,7 @@ actor SessionStore {
                     type: .toolCall(tool),
                     timestamp: session.chatItems[i].timestamp
                 )
-                Self.logger.debug("Tool \(toolUseId.prefix(12), privacy: .public) completed with status: \(String(describing: result.status), privacy: .public)")
+                Self.logger.info("Tool \(toolUseId.prefix(12), privacy: .public) completed with status: \(String(describing: result.status), privacy: .public)")
                 break
             }
         }
