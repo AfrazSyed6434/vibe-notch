@@ -40,6 +40,23 @@ The `codesign --force --deep` step is required — the bundled Sparkle framework
 
 On first launch the app installs Claude Code hooks into `~/.claude/settings.json` and a hook script at `~/.claude/hooks/claude-island-state.py`. Thats all the setup — sessions appear in the notch as they run.
 
+## Updating
+
+Theres no auto update on this fork (removed on purpose). To update an existing build:
+
+```bash
+cd vibe-notch
+git pull
+pkill -f "MacOS/Vibe Notch"
+xcodebuild -scheme ClaudeIsland -configuration Release -derivedDataPath build \
+  -destination 'platform=macOS' build \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
+codesign --force --deep -s - "build/Build/Products/Release/Vibe Notch.app"
+open "build/Build/Products/Release/Vibe Notch.app"
+```
+
+The app refreshes its hooks and hook script automatically on every launch, so no manual hook cleanup is needed. Running Claude Code sessions pick the new hook script up on their next event.
+
 ## Single account
 
 Nothing to configure. Run Claude Code (terminal or desktop app) and sessions show up.
