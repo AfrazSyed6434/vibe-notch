@@ -13,3 +13,4 @@ Changes on this branch after forking from upstream v1.3.
 - Menu cleaned up: no star on github, no update checks, just a link to this repo
 - Sessions show the chat title from the desktop app instead of a truncated first message
 - App writes its own log file to `~/Library/Logs/VibeNotch.log` for easy debugging
+- Silent update check against this repo — settings shows "Update available" with a link to the update instructions. Nothing downloads automatically

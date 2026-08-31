@@ -41,6 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         HookInstaller.installIfNeeded()
         Task { await FileLogMirror.shared.start() }
+        ForkUpdateChecker.shared.start()
         NSApplication.shared.setActivationPolicy(.accessory)
 
         windowManager = WindowManager()

@@ -15,6 +15,7 @@ import Sparkle
 
 struct NotchMenuView: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject private var updateChecker = ForkUpdateChecker.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var soundSelector = SoundSelector.shared
     @State private var hooksInstalled: Bool = false
@@ -86,6 +87,10 @@ struct NotchMenuView: View {
                     .padding(.vertical, 4)
 
                 // About
+                if updateChecker.updateAvailable {
+                    UpdateAvailableRow()
+                }
+
                 MenuRow(
                     icon: "arrow.up.forward.app",
                     label: "Open on GitHub"
@@ -125,6 +130,45 @@ struct NotchMenuView: View {
         hooksInstalled = HookInstaller.isInstalled()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         screenSelector.refreshScreens()
+    }
+}
+
+// MARK: - Update Available Row
+
+/// Informational only — the row itself does nothing; the info icon opens the
+/// README's update instructions.
+struct UpdateAvailableRow: View {
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(TerminalColors.green)
+                .frame(width: 6, height: 6)
+                .frame(width: 16)
+
+            Text("Update available")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+
+            Spacer()
+
+            Button {
+                if let url = URL(string: ForkUpdateChecker.updateInstructionsURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundColor(isHovered ? .white.opacity(0.9) : .white.opacity(0.4))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 }
 
