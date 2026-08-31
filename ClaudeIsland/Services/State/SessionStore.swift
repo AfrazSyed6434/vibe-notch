@@ -129,6 +129,17 @@ actor SessionStore {
         if let binary = event.claudeBinary {
             session.claudeBinary = binary
         }
+        // A compacted/continued conversation keeps its process but gets a new
+        // session id — the old id never emits another hook event and its row
+        // would linger with stale state. One pid = one live session.
+        if let pid = event.pid {
+            let staleIds = sessions.filter { $0.key != sessionId && $0.value.pid == pid }.keys
+            for staleId in staleIds {
+                Self.logger.info("Removing stale session \(staleId.prefix(8), privacy: .public) superseded by \(sessionId.prefix(8), privacy: .public) (pid \(pid, privacy: .public))")
+                sessions.removeValue(forKey: staleId)
+                cancelPendingSync(sessionId: staleId)
+            }
+        }
         if let pid = event.pid {
             let tree = ProcessTreeBuilder.shared.buildTree()
             session.isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
@@ -149,7 +160,18 @@ actor SessionStore {
         // where PermissionRequest hooks never fire). Not remote-approvable —
         // shows the approve-in-app row.
         if event.status == "permission_prompt_notification" {
-            if !session.phase.isWaitingForApproval {
+            if session.phase.isWaitingForApproval {
+                Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): already waitingForApproval, skipping")
+            } else if let remembered = session.lastRemotePermission,
+                      isToolStillPendingApproval(remembered.toolUseId, in: session) {
+                // A real remote-approvable prompt is still pending — another
+                // event knocked the phase out from under it. Restore the real
+                // context (buttons work; its socket is still held) instead of
+                // painting a bogus approve-in-app row.
+                Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): restoring pending remote permission \(remembered.toolUseId.prefix(12), privacy: .public)")
+                session.phase = .waitingForApproval(remembered)
+            } else {
+                Self.logger.info("permission_prompt fallback \(sessionId.prefix(8), privacy: .public): painting approve-in-app (phase was \(String(describing: session.phase), privacy: .public))")
                 let toolName = event.message?.components(separatedBy: " ").last ?? "a tool"
                 let newPhase = SessionPhase.waitingForApproval(PermissionContext(
                     toolUseId: "",
@@ -176,7 +198,13 @@ actor SessionStore {
         if transitionAllowed {
             session.phase = newPhase
         } else {
-            Self.logger.debug("Invalid transition: \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")
+            Self.logger.info("Invalid transition: \(String(describing: session.phase), privacy: .public) -> \(String(describing: newPhase), privacy: .public), ignoring")
+        }
+
+        // Remember remote-approvable permission contexts so the fallback
+        // notification can restore them if a later event displaces the phase
+        if event.event == "PermissionRequest", case .waitingForApproval(let ctx) = newPhase, ctx.canRemoteApprove {
+            session.lastRemotePermission = ctx
         }
 
         if event.event == "PermissionRequest", let toolUseId = event.toolUseId {
@@ -189,6 +217,7 @@ actor SessionStore {
 
         if event.event == "Stop" {
             session.subagentState = SubagentState()
+            session.lastRemotePermission = nil
         }
 
         sessions[sessionId] = session
@@ -406,6 +435,10 @@ actor SessionStore {
     private func processPermissionApproved(sessionId: String, toolUseId: String) async {
         guard var session = sessions[sessionId] else { return }
 
+        if session.lastRemotePermission?.toolUseId == toolUseId {
+            session.lastRemotePermission = nil
+        }
+
         // Update tool status in chat history first
         updateToolStatus(in: &session, toolId: toolUseId, status: .running)
 
@@ -446,6 +479,10 @@ actor SessionStore {
     /// This is the authoritative handler for tool completions - ensures consistent state updates
     private func processToolCompleted(sessionId: String, toolUseId: String, result: ToolCompletionResult) async {
         guard var session = sessions[sessionId] else { return }
+
+        if session.lastRemotePermission?.toolUseId == toolUseId {
+            session.lastRemotePermission = nil
+        }
 
         // Check if this tool is already completed (avoid duplicate processing)
         if let existingItem = session.chatItems.first(where: { $0.id == toolUseId }),
@@ -494,6 +531,15 @@ actor SessionStore {
         sessions[sessionId] = session
     }
 
+
+    /// Whether a tool is still shown as waiting for approval in chat history
+    private func isToolStillPendingApproval(_ toolUseId: String, in session: SessionState) -> Bool {
+        guard !toolUseId.isEmpty else { return false }
+        guard let item = session.chatItems.first(where: { $0.id == toolUseId }),
+              case .toolCall(let tool) = item.type else { return false }
+        return tool.status == .waitingForApproval
+    }
+
     /// Find the next tool waiting for approval (excluding a specific tool ID)
     private func findNextPendingTool(in session: SessionState, excluding toolId: String) -> (id: String, name: String, timestamp: Date)? {
         for item in session.chatItems {
@@ -507,6 +553,10 @@ actor SessionStore {
 
     private func processPermissionDenied(sessionId: String, toolUseId: String, reason: String?) async {
         guard var session = sessions[sessionId] else { return }
+
+        if session.lastRemotePermission?.toolUseId == toolUseId {
+            session.lastRemotePermission = nil
+        }
 
         // Update tool status in chat history first
         updateToolStatus(in: &session, toolId: toolUseId, status: .error)
@@ -543,6 +593,10 @@ actor SessionStore {
 
     private func processSocketFailure(sessionId: String, toolUseId: String) async {
         guard var session = sessions[sessionId] else { return }
+
+        if session.lastRemotePermission?.toolUseId == toolUseId {
+            session.lastRemotePermission = nil
+        }
 
         // Mark the failed tool's status as error
         updateToolStatus(in: &session, toolId: toolUseId, status: .error)

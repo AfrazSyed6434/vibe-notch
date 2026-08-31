@@ -32,6 +32,12 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// Current phase in the session lifecycle
     var phase: SessionPhase
 
+    /// The most recent remote-approvable permission context, kept so the
+    /// fallback notification can restore real Allow/Deny buttons if another
+    /// event knocked the session out of waitingForApproval while the prompt
+    /// is still pending. Cleared when the permission resolves.
+    var lastRemotePermission: PermissionContext?
+
     // MARK: - Chat History
 
     /// All chat items for this session (replaces ChatHistoryManager.histories)
